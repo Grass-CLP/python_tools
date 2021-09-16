@@ -6,7 +6,7 @@
 #
 
 import numpy as np
-import pandas as pd  # pip install pandas>=1.1.0
+import pandas as pd  # pip install pandas>=1.1
 
 
 def compare_table(table_x, table_y, keys) -> dict or None:
@@ -18,41 +18,33 @@ def compare_table(table_x, table_y, keys) -> dict or None:
     :return:  miss_col, more_col, miss_keys, more_keys, com_re_dt, com_df
     """
 
+    # format col
     miss_col = list(set(table_x.columns.tolist()) - set(table_y.columns.tolist()))
     more_col = list(set(table_y.columns.tolist()) - set(table_x.columns.tolist()))
     com_col = table_x.columns.tolist()
     _ = [com_col.remove(x) for x in miss_col]
-
-    table_com_x = table_x[com_col]
-    table_com_y = table_y[com_col]
-
+    # check
     for k in keys:
         if k not in com_col:
             print(f"keys '{k}' do not exist")
             return None
+    table_com_x, table_com_y = table_x[com_col], table_y[com_col]
 
-    # format keys
+    # delete duplicate
     duplicates = dict()
     for k, df in {'x': table_com_x, 'y': table_com_y}.items():
-        data_index = df[keys[0]].map(str)
-        for i in range(1, len(keys)):
-            data_index = data_index + '_' + df[keys[i]].map(str)
+        duplicated_index = df.duplicated(subset=keys)
+        duplicates[f"duplicated_{k}"] = df[duplicated_index].set_index(keys)
+        df.drop(index=df.index[duplicated_index], inplace=True)
+        df.set_index(keys, inplace=True)
 
-        # unique
-        duplicated_index = df.index[data_index.duplicated()].tolist()
-        duplicates[f"duplicated_{k}"] = data_index[duplicated_index].tolist()
-        df.drop(index=duplicated_index, inplace=True)
-        data_index.drop(index=duplicated_index, inplace=True)
-
-        # set into index
-        df.index = data_index
-
-    # compare items sum
+    # clean dataset rows
     com_re_dt = dict()
-    miss_keys = list(set(table_com_x.index) - set(table_com_y.index))
-    more_keys = list(set(table_com_y.index) - set(table_com_x.index))
-    table_com_x = table_com_x[table_com_x.index.map(lambda x: x not in miss_keys)].sort_index()
-    table_com_y = table_com_y[table_com_y.index.map(lambda x: x not in more_keys)].sort_index()
+    intersection = set(table_com_x.index).intersection(set(table_com_y.index))
+    miss_keys = set(table_com_x.index) - intersection
+    more_keys = set(table_com_y.index) - intersection
+    table_com_x = table_com_x.drop(miss_keys).sort_index()
+    table_com_y = table_com_y.drop(more_keys).sort_index()
     com_num = len(table_com_x)
 
     # compare
@@ -82,9 +74,10 @@ if __name__ == "__main__":
         {
             "col2": [1.0, 3.0, 2.0, np.nan, 5.0],
             "col1": ["a", "c", "b", "d", "a"],
-            "col3": [1.0, 3.0, 2.0, 4.0, 5.0]
-        },
-        columns=["col2", "col1", "col3"],
+            "col3": [1.0, 3.0, 2.0, 4.0, 5.0],
+            "col5": [1.0, 3.0, 2.0, 4.0, 1.0],
+            "col6": [1.0, 3.0, 2.0, 4.0, 5.0],
+        }
     )
 
     df2 = pd.DataFrame(
@@ -92,11 +85,12 @@ if __name__ == "__main__":
             "col1": ["a", "b", "c", "d", "f"],
             "col2": [1.0, np.nan, 4.0, 4.0, 5.0],
             "col4": [1.0, 2.0, 3.0, 4.0, 5.0],
-        },
-        columns=["col1", "col2", "col4"],
+            "col5": [1.0, 2.0, 3.0, 4.0, 1.0],
+            "col6": [1.0, 3.0, 2.0, 4.1, 5.0],
+        }
     )
 
-    result = compare_table(df, df2, ['col1'])
+    result = compare_table(df, df2, ['col1', 'col5'])
     print(result)
     """
          col2      
